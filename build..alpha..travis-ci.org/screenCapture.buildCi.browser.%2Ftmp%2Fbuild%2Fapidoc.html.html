@@ -1,0 +1,205 @@
+<html><head></head><body><div class="apidocDiv">
+<style>
+/*csslint
+*/
+.apidocDiv {
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.apidocDiv a[href] {
+    color: #33f;
+    font-weight: bold;
+    text-decoration: none;
+}
+.apidocDiv a[href]:hover {
+    text-decoration: underline;
+}
+.apidocCodeCommentSpan {
+    background: #bbf;
+    color: #000;
+    display: block;
+}
+.apidocCodeKeywordSpan {
+    color: #d00;
+    font-weight: bold;
+}
+.apidocCodePre {
+    background: #eef;
+    border: 1px solid;
+    color: #777;
+    padding: 5px;
+    white-space: pre-wrap;
+}
+.apidocFooterDiv {
+    margin-top: 20px;
+    text-align: center;
+}
+.apidocModuleLi {
+    margin-top: 10px;
+}
+.apidocSectionDiv {
+    border-top: 1px solid;
+    margin-top: 20px;
+}
+.apidocSignatureSpan {
+    color: #777;
+    font-weight: bold;
+}
+</style>
+<h1>api documentation for
+    <a>modify-babel-preset (v3.2.1)</a>
+</h1>
+<h4>Create a modified babel preset based on an an existing preset.</h4>
+<div class="apidocSectionDiv"><a href="#apidoc.tableOfContents" id="apidoc.tableOfContents"><h1>table of contents</h1></a><ol>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.modify-babel-preset">module modify-babel-preset</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.modify-babel-preset.modify-babel-preset">
+            function <span class="apidocSignatureSpan"></span>modify-babel-preset
+            <span class="apidocSignatureSpan">(presetInput, modifications)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+</ol></div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.modify-babel-preset" id="apidoc.module.modify-babel-preset">module modify-babel-preset</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.modify-babel-preset.modify-babel-preset" id="apidoc.element.modify-babel-preset.modify-babel-preset">
+        function <span class="apidocSignatureSpan"></span>modify-babel-preset
+        <span class="apidocSignatureSpan">(presetInput, modifications)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">modify-babel-preset = function (presetInput, modifications) {
+	var options = {};
+
+	if (Array.isArray(presetInput)) {
+		options = presetInput[1];
+		presetInput = presetInput[0];
+	}
+	modifications = modifications || {};
+
+	var preset;
+	if (typeof presetInput==='string') {
+		if (!presetInput.match(/(^babel-preset-|[\\/])/)) {
+			try {
+				preset = relative.resolve('babel-preset-'+presetInput, __dirname);
+			} catch(err) {
+				console.log(err);
+			}
+		}
+		if (!preset) {
+			preset = require.resolve(presetInput);
+		}
+	}
+
+	preset = path.resolve(preset);
+
+	var presetModule = normalizePreset(require(preset), null, options);
+
+	var orig = presetModule['modify-babel-preset'];
+	if (orig) {
+		console.log('Found nested modify-babel-preset configuration, flattening.');
+		return modify(orig.preset, extend(extend({}, orig.modifications), modifications));
+	}
+
+	var cwd = path.dirname(preset) || process.cwd();
+
+	// console.log('cwd: ', cwd);
+
+	var serialized = serialize(preset, {
+		options: options,
+		cwd: cwd
+	});
+
+	var alias = serialized.alias;
+	var plugins = getFlattenedPlugins(serialized);
+
+	function isSameName(a, b) {
+		if (typeof a!=='string' || typeof b!=='string') return false;
+		return a.replace(/^babel-plugin-/i, '').toLowerCase() === b.replace(/^babel-plugin-/i, '').toLowerCase();
+	}
+
+	function indexOf(plugins, key) {
+		for (var i=plugins.length; i--; ) {
+			var mod = Array.isArray(plugins[i]) ? plugins[i][0] : plugins[i];
+			var name = typeof mod==='string' &amp;&amp; getModuleName(mod) || mod._original_name;
+			name = alias[name] || name;
+			if (isSameName(name, key)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	Object.keys(modifications).forEach(function(key) {
+		if (key==='nameDrops' || key==='string') return;
+
+		var value = modifications[key],
+			index = indexOf(plugins, key);
+		if (value===false) {
+			if (index!==-1) {
+				plugins.splice(index, 1);
+			}
+			else if (process.env.NODE_ENV==='development') {
+				console.warn(key+' not found', __dirname);
+			}
+		}
+		else {
+			var imported = requireBabelPlugin(key, cwd),
+				p = imported.mod;
+			setHiddenProp(p, '_original_name', imported.name);
+			if (value!==true) {
+				p = [p].concat(value);
+			}
+			if (index&lt;0) {
+				plugins.push(p);
+			}
+			else {
+				plugins[index] = p;
+			}
+		}
+	});
+
+	if (modifications.string!==true) {
+		plugins = plugins.map(function(plugin) {
+			var mod = Array.isArray(plugin) ? plugin[0] : plugin;
+			if (typeof mod==='string') {
+				var p = path.resolve(cwd, mod);
+				mod = require(p);
+				setHiddenProp(mod, '_original_name', p);
+			}
+			return Array.isArray(plugin) ? [mod].concat(plugin.slice(1)) : mod;
+		});
+	}
+
+	var out = { plugins:plugins };
+
+	setHiddenProp(out, 'modify-babel-preset', {
+		preset: path.dirname(path.resolve(preset)),
+		modifications: modifications
+	});
+
+	return out;
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocFooterDiv">
+    [ this document was created with
+    <a href="https://github.com/kaizhu256/node-utility2" target="_blank">utility2</a>
+    ]
+</div>
+</div>
+</body></html>
